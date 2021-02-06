@@ -4,6 +4,7 @@ from TDSTransactionTracker import TDSTransactionTracker
 import logging
 import torch
 import numpy as np
+import NeuralNetwork
 logging.getLogger().setLevel(level=logging.ERROR)
 
 cb = TDSCoinbaseData()
@@ -161,6 +162,19 @@ def model_predictions(frame, step=60):
 #------
 
 
+def nn_predictions(step=15):
+    model = NeuralNetwork.FF()
+    model.load_state_dict(torch.load("all_net.pth"))
+
+    predictions = torch.zeros(4, step, 4)
+    current_stack = torch.tensor(currency_stack[:, :, 0:4])
+    for i in range(step):
+        out = model(current_stack)
+        predictions[:, i:i + 1, :] = out
+        current_stack[:, 1:60, :] = current_stack[:, 0:59, :]
+        current_stack[:, 0:1, :] = out
+    return predictions
+
 
 tick = tick_gen.get_tick()
 last_price = tick.p.btc_usd.close
@@ -175,7 +189,7 @@ while tick is not None:
     if frame > wait:
         if tick is not None:
             #TODO get predicted tickers from NeuralNetwork
-            makeTrade(tick, model_predictions(frame), last_price)
+            makeTrade(tick, nn_predictions(), last_price)
 
 
 # Display findings
