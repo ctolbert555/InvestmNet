@@ -12,7 +12,7 @@ starts = ['20201001', '20200701', '20190601']
 ends = ['20201231', '20200930', '20190831']
 
 #Global variables
-index = 0
+index = 2
 start_date = starts[index]
 end_date = ends[index]
 products = ['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']
@@ -20,6 +20,7 @@ isHolding = True
 takers_fee = 0.0018
 # Initialize stack
 currency_stack = torch.zeros((4, 60, 5))
+projection = torch.zeros((4, 1, 4))
 
 print("Data grabbed")
 # Instantiate a tick generator
@@ -34,68 +35,62 @@ print("Generator and Tracker created")
 def updateStack(tick):
     '''
     Updates the stack with the current tick
-    :param currency_type:
-    0 - usd
-    1 - eth
-    2 - ltc
-    3 - eur
     :return: None
     '''
-
     #shift stack
     currency_stack[:, 1:60, :] = currency_stack[:, 0:59, :]
 
     '''USD'''
     currency_type = 0
     # Update high
-    currency_stack[(currency_type, 0, 0)] = tick.p.btc_usd.high
+    currency_stack[currency_type, 0, 0] = tick.p.btc_usd.high
     # Update low
-    currency_stack[(currency_type, 0, 1)] = tick.p.btc_usd.low
+    currency_stack[currency_type, 0, 1] = tick.p.btc_usd.low
     # Update open
-    currency_stack[(currency_type, 0, 2)] = tick.p.btc_usd.open
+    currency_stack[currency_type, 0, 2] = tick.p.btc_usd.open
     # Update close
-    currency_stack[(currency_type, 0, 3)] = tick.p.btc_usd.close
+    currency_stack[currency_type, 0, 3] = tick.p.btc_usd.close
     # Update volume
-    currency_stack[(currency_type, 0, 4)] = tick.p.btc_usd.volume
+    currency_stack[currency_type, 0, 4] = tick.p.btc_usd.volume
 
     '''ETH'''
     currency_type = 1
     # Update high
-    currency_stack[(currency_type, 0, 0)] = tick.p.eth_btc.high
+    currency_stack[currency_type, 0, 0] = tick.p.eth_btc.high
     # Update low
-    currency_stack[(currency_type, 0, 1)] = tick.p.eth_btc.low
+    currency_stack[currency_type, 0, 1] = tick.p.eth_btc.low
     # Update open
-    currency_stack[(currency_type, 0, 2)] = tick.p.eth_btc.open
+    currency_stack[currency_type, 0, 2] = tick.p.eth_btc.open
     # Update close
-    currency_stack[(currency_type, 0, 3)] = tick.p.eth_btc.close
+    currency_stack[currency_type, 0, 3] = tick.p.eth_btc.close
     # Update volume
-    currency_stack[(currency_type, 0, 4)] = tick.p.eth_btc.volume
+    currency_stack[currency_type, 0, 4] = tick.p.eth_btc.volume
 
     '''LTC'''
     currency_type = 2
     # Update high
-    currency_stack[(currency_type, 0, 0)] = tick.p.ltc_btc.high
+    currency_stack[currency_type, 0, 0] = tick.p.ltc_btc.high
     # Update low
-    currency_stack[(currency_type, 0, 1)] = tick.p.ltc_btc.low
+    currency_stack[currency_type, 0, 1] = tick.p.ltc_btc.low
     # Update open
-    currency_stack[(currency_type, 0, 2)] = tick.p.ltc_btc.open
+    currency_stack[currency_type, 0, 2] = tick.p.ltc_btc.open
     # Update close
-    currency_stack[(currency_type, 0, 3)] = tick.p.ltc_btc.close
+    currency_stack[currency_type, 0, 3] = tick.p.ltc_btc.close
     # Update volume
-    currency_stack[(currency_type, 0, 4)] = tick.p.ltc_btc.volume
+    currency_stack[currency_type, 0, 4] = tick.p.ltc_btc.volume
 
     '''EUR'''
     currency_type = 3
     # Update high
-    currency_stack[(currency_type, 0, 0)] = tick.p.btc_eur.high
+    currency_stack[currency_type, 0, 0] = tick.p.btc_eur.high
     # Update low
-    currency_stack[(currency_type, 0, 1)] = tick.p.btc_eur.low
+    currency_stack[currency_type, 0, 1] = tick.p.btc_eur.low
     # Update open
-    currency_stack[(currency_type, 0, 2)] = tick.p.btc_eur.open
+    currency_stack[currency_type, 0, 2] = tick.p.btc_eur.open
     # Update close
-    currency_stack[(currency_type, 0, 3)] = tick.p.btc_eur.close
+    currency_stack[currency_type, 0, 3] = tick.p.btc_eur.close
     # Update volume
-    currency_stack[(currency_type, 0, 4)] = tick.p.btc_eur.volume
+    currency_stack[currency_type, 0, 4] = tick.p.btc_eur.volume
 
 #------
 #------
@@ -144,7 +139,7 @@ def checkIfLTC():
 #------
 #------
 # Function that checks predictions to see if this ticker is a buy/sell
-def makeTrade(current_tick, tickers, last_price):
+def makeTrade(current_tick, tickers):
     usd_val = 1/tick.p.btc_usd.close
     eth_val = tick.p.eth_btc.close
     ltc_val = tick.p.ltc_btc.close
@@ -157,24 +152,28 @@ def makeTrade(current_tick, tickers, last_price):
         #TODO correct for numpy array
         if tickers[0].min() >= usd_val:
             # BUY USD
+            print("BUY USD")
             if tick.p.btc_usd.volume * 0.5 > trans_tracker.get_holdings()["BTC"] / fraction:
                 trans_tracker.make_trade(current_tick, 'BTC-USD', 'sell', trans_tracker.get_holdings()["BTC"] / fraction)
             else:
                 trans_tracker.make_trade(current_tick, 'BTC-USD', 'sell', tick.p.btc_usd.volume * 0.4999999)
         if tickers[1].min() >= eth_val:
             # BUY ETH
+            print("BUY ETH")
             if tick.p.eth_btc.volume * 0.5 > (trans_tracker.get_holdings()["BTC"] / fraction) / eth_val:
                 trans_tracker.make_trade(current_tick, 'ETH-BTC', 'buy', trans_tracker.get_holdings()["BTC"] / fraction)
             else:
                 trans_tracker.make_trade(current_tick, 'ETH-BTC', 'buy', (tick.p.eth_btc.volume * 0.499999) * eth_val)
         if tickers[2].min() >= ltc_val:
             # BUY LTC
+            print("BUY LTC")
             if tick.p.ltc_btc.volume * 0.5 > (trans_tracker.get_holdings()["BTC"] / fraction) / ltc_val:
                 trans_tracker.make_trade(current_tick, 'LTC-BTC', 'buy', trans_tracker.get_holdings()["BTC"] / fraction)
             else:
                 trans_tracker.make_trade(current_tick, 'LTC-BTC', 'buy', tick.p.ltc_btc.volume * 0.499999 * ltc_val)
         if tickers[3].min() >= eur_val:
             # BUY EUR
+            print("BUY EUR")
             if tick.p.btc_eur.volume * 0.5 > trans_tracker.get_holdings()["BTC"] / fraction:
                 trans_tracker.make_trade(current_tick, 'BTC-EUR', 'sell', trans_tracker.get_holdings()["BTC"] / fraction)
             else:
@@ -182,6 +181,7 @@ def makeTrade(current_tick, tickers, last_price):
     if checkIfUSD():
         # Scenario where current_tick is peak
         if tickers[0].max() <= usd_val:
+            print("SELL USD")
             if tick.p.btc_usd.volume * 0.5 > trans_tracker.get_holdings()["USD"] * usd_val:
                 trans_tracker.make_trade(current_tick, 'BTC-USD', 'buy', trans_tracker.get_holdings()["USD"])
             else:
@@ -189,6 +189,7 @@ def makeTrade(current_tick, tickers, last_price):
     if checkIfETH():
         # Scenario where current_tick is peak
         if tickers[1].max() <= eth_val:
+            print("SELL ETH")
             if tick.p.eth_btc.volume * 0.5 > trans_tracker.get_holdings()["ETH"]:
                 trans_tracker.make_trade(current_tick, 'ETH-BTC', 'sell', trans_tracker.get_holdings()["ETH"])
             else:
@@ -196,6 +197,7 @@ def makeTrade(current_tick, tickers, last_price):
     if checkIfLTC():
         # Scenario where current_tick is peak
         if tickers[2].max() <= ltc_val:
+            print("SELL LTC")
             if tick.p.ltc_btc.volume * 0.5 > trans_tracker.get_holdings()["LTC"]:
                 trans_tracker.make_trade(current_tick, 'LTC-BTC', 'sell', trans_tracker.get_holdings()["LTC"])
             else:
@@ -203,6 +205,7 @@ def makeTrade(current_tick, tickers, last_price):
     if checkIfEUR():
         # Scenario where current_tick is peak
         if tickers[3].max() <= eur_val:
+            print("SELL EUR")
             if tick.p.btc_eur.volume * 0.5 > trans_tracker.get_holdings()["EUR"] * eur_val:
                 trans_tracker.make_trade(current_tick, 'BTC-EUR', 'buy', trans_tracker.get_holdings()["EUR"])
             else:
@@ -228,34 +231,34 @@ def model_predictions(frame, step=60):
 #------
 
 
-def nn_predictions(step=15):
-    model = NeuralNetwork.FF()
-    model.load_state_dict(torch.load("all_net.pth"))
-
-    predictions = torch.zeros(4, step, 4)
-    current_stack = torch.tensor(currency_stack[:, :, 0:4])
-    for i in range(step):
-        out = model(current_stack)
-        predictions[:, i:i + 1, :] = out
-        current_stack[:, 1:60, :] = current_stack[:, 0:59, :]
-        current_stack[:, 0:1, :] = out
-    return predictions
+def nn_predictions(model):
+    current_stack = currency_stack[:, :, 0:4].clone().detach()
+    out = model(current_stack)
+    out[0] = 1/out[0]
+    out[3] = 1/out[3]
+    return out
 
 
 tick = tick_gen.get_tick()
-last_price = tick.p.btc_usd.close
+# last_price = tick.p.btc_usd.close
+net = NeuralNetwork.FF()
+net.load_state_dict(torch.load("multi_net.pth"))
 # Which frame we are currently on
 frame = 0
 # How many minutes we should wait before tradig (usually because we need enough data)
 wait = 60
 while tick is not None:
-    tick = tick_gen.get_tick()
+    updateStack(tick)
+    # print(currency_stack[:, 0, 3])
     frame += 1
     #TODO Save tickers into tensor code so we can perform volatility calculations
-    if frame > wait:
-        if tick is not None:
-            #TODO get predicted tickers from NeuralNetwork
-            makeTrade(tick, nn_predictions(), last_price)
+    if frame > wait and frame < df_usd['volume'].size - 5:
+        #TODO get predicted tickers from NeuralNetwork
+        #predictions = nn_predictions(net)[:, :5, :]
+        predictions = model_predictions(frame)
+        #print(predictions)
+        makeTrade(tick, predictions)
+    tick = tick_gen.get_tick()
 
 
 # Display findings

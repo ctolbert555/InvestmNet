@@ -12,7 +12,7 @@ class FF(nn.Module):
         self.fc1 = nn.Linear(240, 160)
         self.fc2 = nn.Linear(160, 80)
         self.fc3 = nn.Linear(80, 40)
-        self.fc4 = nn.Linear(40, 4)
+        self.fc4 = nn.Linear(40, 60)
 
     def forward(self, x):
 
@@ -21,7 +21,11 @@ class FF(nn.Module):
         out = self.fc2(out)
         out = self.fc3(out)
         out = self.fc4(out)
-        return out
+        return out.reshape((4, 15, 4))
+
+
+def MAPE(target, actual):
+    return torch.mean(torch.abs((target-actual)/((target+actual)/2)))
 
 
 def train_model(load_path, save_path, epochs, products=['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']):
@@ -31,7 +35,6 @@ def train_model(load_path, save_path, epochs, products=['BTC-USD', 'ETH-BTC', 'L
 
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    batch_size = 64
 
     cb = TDSCoinbaseData()
     start_date = '20200101'
@@ -68,9 +71,9 @@ def train_model(load_path, save_path, epochs, products=['BTC-USD', 'ETH-BTC', 'L
 
     for t in range(epochs):
         avg_loss = torch.zeros(1)
-        for i in range(tensor_data.shape[1] - 60):
+        for i in range(tensor_data.shape[1] - 75):
             output = model(tensor_data[:, i:i+60, :])
-            loss = criterion(output, tensor_data[:, i+60:i+61, :])
+            loss = criterion(output, tensor_data[:, i+60:i+75, :])
             avg_loss += loss
 
             optimizer.zero_grad()
@@ -78,7 +81,7 @@ def train_model(load_path, save_path, epochs, products=['BTC-USD', 'ETH-BTC', 'L
             optimizer.step()
 
         print("AVG LOSS")
-        print(avg_loss / (tensor_data.shape[1] - 60))
+        print(avg_loss / (tensor_data.shape[1] - 75))
         print("SAVING")
         torch.save(model.state_dict(), save_path)
 
@@ -121,15 +124,15 @@ def test_model(path, products=['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']):
     tensor_data = torch.stack([tensor_low, tensor_high, tensor_open, tensor_close], 1).reshape((4, -1, 4)).float()
 
     avg_loss = torch.zeros(1)
-    for i in range(tensor_data.shape[1] - 60):
+    for i in range(tensor_data.shape[1] - 75):
         output = model(tensor_data[:, i:i + 60, :])
-        print(output[:, :, 3], tensor_data[:, i + 60:i + 61, 3])
-        loss = criterion(output[:, :, 3], tensor_data[:, i + 60:i + 61, 3])
+        # print(output[:, :, 3], tensor_data[:, i + 60:i + 61, 3])
+        loss = criterion(output[:, :, 3], tensor_data[:, i + 60:i + 75, 3])
         avg_loss += loss
-    avg_loss /= (tensor_data.shape[1] - 60)
+    avg_loss /= (tensor_data.shape[1] - 75)
     print("AVG LOSS: ")
     print(avg_loss)
 
 
-#train_model("", "all_net.pth", 50)
-#test_model("all_net.pth")
+#train_model("", "multi_net.pth", 50)
+#test_model("multi_net.pth")
