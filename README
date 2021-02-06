@@ -1,16 +1,16 @@
-TEAM NAME:  ##########
+TEAM NAME:  InvestmNet
 
 PERIOD 1:
-OUTPUT TRADES FILE  : ########
-SHARPE RATIO        : ########
+OUTPUT TRADES FILE  : trades_0.json
+SHARPE RATIO        : 0.9649735165161553
 
 PERIOD 2:
-OUTPUT TRADES FILE  : ########
-SHARPE RATIO        : ########
+OUTPUT TRADES FILE  : trades_1.json
+SHARPE RATIO        : 0.7158829105080085
 
 PERIOD 3:
-OUTPUT TRADES FILE  : ########
-SHARPE RATIO        : ########
+OUTPUT TRADES FILE  : trades_2.json
+SHARPE RATIO        : 0.5939495056074248
 
 
 COMMENTS:

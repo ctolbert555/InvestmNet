@@ -133,7 +133,7 @@ class TDSTransactionTracker:
 
         volume_moving = size_to_liq
         if side.lower() == 'buy':
-            volume_moving = size_to_liq / product_info.high
+            volume_moving = size_to_liq / product_info.close
         
         if available_volume < volume_moving:
             # ensure enough market volume to execute trade
@@ -215,7 +215,7 @@ class TDSTransactionTracker:
         necessary_products = []
         holdings_copy = holdings.copy()
         for key in holdings_copy.keys():
-            if key in ['USD', 'GBP', 'EUR']:
+            if key in ['USD', 'GBP', 'EUR', 'USDC']:
                 necessary_products.append(f"BTC-{key}")
             else:
                 necessary_products.append(f"{key}-USD")
@@ -228,7 +228,7 @@ class TDSTransactionTracker:
         total_btc = 0.0
 
         for key in holdings_copy.keys():
-            if key in ['USD', 'GBP', 'EUR']:
+            if key in ['USD', 'GBP', 'EUR', 'USDC']:
                 product_info = getattr(tick.p, f'BTC_{key}'.lower())
                 btc_holdings = holdings_copy[key] / product_info.close
             elif key == 'BTC':
