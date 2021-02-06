@@ -9,7 +9,7 @@ cb = TDSCoinbaseData()
 starts = ['20201001', '20200701', '20190601']
 ends = ['20201231', '20200930', '20190831']
 
-index = 2
+index = 0
 start_date = starts[index]
 end_date = ends[index]
 products = ['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']
@@ -184,7 +184,8 @@ def model_predictions(frame, step=60):
 
     return np.stack((1/df_usd['close'].values[frame:frame+step],
                     df_eth['close'].values[frame:frame+step],
-                    df_ltc['close'].values[frame:frame+step]), 0)
+                    df_ltc['close'].values[frame:frame+step],
+                    1/df_eur['close'].values[frame:frame+step]), 0)
 
 
 tick = tick_gen.get_tick()
