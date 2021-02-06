@@ -31,6 +31,72 @@ df_ltc = cb.get_market_data(products[2], start_date, end_date, interval=60, over
 df_eur = cb.get_market_data(products[3], start_date, end_date, interval=60, overwrite=False)
 print("Generator and Tracker created")
 
+def updateStack(tick):
+    '''
+    Updates the stack with the current tick
+    :param currency_type:
+    0 - usd
+    1 - eth
+    2 - ltc
+    3 - eur
+    :return: None
+    '''
+
+    #shift stack
+    currency_stack[:, 1:60, :] = currency_stack[:, 0:59, :]
+
+    '''USD'''
+    currency_type = 0
+    # Update high
+    currency_stack[(currency_type, 0, 0)] = tick.p.btc_usd.high
+    # Update low
+    currency_stack[(currency_type, 0, 1)] = tick.p.btc_usd.low
+    # Update open
+    currency_stack[(currency_type, 0, 2)] = tick.p.btc_usd.open
+    # Update close
+    currency_stack[(currency_type, 0, 3)] = tick.p.btc_usd.close
+    # Update volume
+    currency_stack[(currency_type, 0, 4)] = tick.p.btc_usd.volume
+
+    '''ETH'''
+    currency_type = 1
+    # Update high
+    currency_stack[(currency_type, 0, 0)] = tick.p.eth_btc.high
+    # Update low
+    currency_stack[(currency_type, 0, 1)] = tick.p.eth_btc.low
+    # Update open
+    currency_stack[(currency_type, 0, 2)] = tick.p.eth_btc.open
+    # Update close
+    currency_stack[(currency_type, 0, 3)] = tick.p.eth_btc.close
+    # Update volume
+    currency_stack[(currency_type, 0, 4)] = tick.p.eth_btc.volume
+
+    '''LTC'''
+    currency_type = 2
+    # Update high
+    currency_stack[(currency_type, 0, 0)] = tick.p.ltc_btc.high
+    # Update low
+    currency_stack[(currency_type, 0, 1)] = tick.p.ltc_btc.low
+    # Update open
+    currency_stack[(currency_type, 0, 2)] = tick.p.ltc_btc.open
+    # Update close
+    currency_stack[(currency_type, 0, 3)] = tick.p.ltc_btc.close
+    # Update volume
+    currency_stack[(currency_type, 0, 4)] = tick.p.ltc_btc.volume
+
+    '''EUR'''
+    currency_type = 3
+    # Update high
+    currency_stack[(currency_type, 0, 0)] = tick.p.btc_eur.high
+    # Update low
+    currency_stack[(currency_type, 0, 1)] = tick.p.btc_eur.low
+    # Update open
+    currency_stack[(currency_type, 0, 2)] = tick.p.btc_eur.open
+    # Update close
+    currency_stack[(currency_type, 0, 3)] = tick.p.btc_eur.close
+    # Update volume
+    currency_stack[(currency_type, 0, 4)] = tick.p.btc_eur.volume
+
 #------
 #------
 # Helper funciton to check if a trade should be profitable
