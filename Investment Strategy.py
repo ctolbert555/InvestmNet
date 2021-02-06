@@ -10,22 +10,22 @@ cb = TDSCoinbaseData()
 start_date = '20200101'
 end_date = '20201231'
 products = ['BTC-USD', 'ETH-USD', 'LTC-USD', 'ETH-BTC', 'LTC-BTC']
-isHolding = False
+isHolding = True
 takers_fee = 0.0018
 
 for product in products:
     ## Only use overwrite=True when backfilling data. Otherwise, either specify overwrite=False or omit the arg entirely
     df = cb.get_market_data(product, start_date, end_date, interval=60, overwrite=False)
-
+print("Data grabbed")
 # Instantiate a tick generator
 tick_gen = TDSTickGenerator(cb, products, start_date, end_date, interval=60)
 trans_tracker = TDSTransactionTracker(start_date, end_date, holdings={'BTC' : 1.0})
 
-
+print("Generator and Tracker created")
 
 #TEST findHigh
 down_slope = [188, 187, 186, 185, 184, 183]
-up_slope = [188, 189, 190, 191, 194, 195]
+up_slope = [188, 189, 190, 191, 194, 50000]
 peak = [188, 189, 190, 191, 194, 195, 194, 193, 192]
 troph = [188, 187, 186, 185, 184, 183, 188, 189, 190, 191, 194, 195]
 # Helper function to find the highest ticker in a sequence
@@ -71,34 +71,39 @@ print("Troph: ", findLow(troph))
 #             return False
 #     return True
 
-
+# Function to check if we are currently holding bitcoin
+def checkIfHolding():
+    if trans_tracker.get_holdings()["BTC"] == 0.0:
+        return False
+    return True
 
 # Function that checks predictions to see if this ticker is a buy/sell
 
-def makeTrade(isHolding, current_tick, tickers):
+def makeTrade(isHold, current_tick, tickers):
     ticker_price = tick.p.btc_usd.close
     #TODO if looking to buy, True, otherwise false
-    if not isHolding:
+    if not checkIfHolding():
         # Scenerio where current_tick is a trough
         #TODO correct for numpy array
         if(findLow(tickers) >= ticker_price):
             trans_tracker.make_trade(current_tick, 'BTC-USD', 'buy', -1)
-            isHolding = False
     else:
         # Scenerio where current_tick is peak
         if findHigh(tickers) <= ticker_price:
             trans_tracker.make_trade(current_tick, 'BTC-USD', 'sell', -1)
-            isHolding = True
        # Scenerio where in future there will be a better buy
-        else if
+
 
 
 tick = tick_gen.get_tick()
-last_price = tick.tick.p.btc_usd.close
+last_price = tick.p.btc_usd.close
 
 
 while tick is not None:
     tick = tick_gen.get_tick()
     if tick is not None:
         #TODO get predicted tickers from NeuralNetwork
-        makeTrade(isHolding, tick, down_slope)
+        makeTrade(isHolding, tick, up_slope)
+trans_tracker.plot_btc_holdings()
+print(trans_tracker.get_sharpe_ratio())
+trans_tracker.dump_trades('example_trades.json')
