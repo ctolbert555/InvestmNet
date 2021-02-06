@@ -24,29 +24,35 @@ def train_model(epochs, product='BTC-USD'):
     model = GRU()
     criterion = torch.nn.MSELoss(reduction='mean')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    batch_size = 16
 
     cb = TDSCoinbaseData()
     start_date = '20200101'
     end_date = '20200531'
 
     df = cb.get_market_data(product, start_date, end_date, interval=60)
-    data = df.to_numpy()
-    relevant_data = torch.tensor(data[:, 1:6])
-    print(relevant_data[0])
-    print(relevant_data.shape)
-
-    hist = np.zeros(epochs)
+    tensor_low = torch.tensor(df['low'].values)
+    tensor_high = torch.tensor(df['high'].values)
+    tensor_open = torch.tensor(df['open'].values)
+    tensor_close = torch.tensor(df['close'].values)
+    tensor_volume = torch.tensor(df['volume'].values)
+    tensor_data = torch.stack([tensor_low, tensor_high, tensor_open, tensor_close, tensor_volume], 1)
+    print(tensor_data[0])
+    print(tensor_data.shape)
 
     for t in range(epochs):
 
-        for i in range(data.shape[0]):
-            output = model(relevant_data[i])
-            loss = criterion(output, relevant_data[i+1])
-
-        hist[t] = loss.item()
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        batch = 0
+        for i in range(tensor_data.shape[0]-1):
+            print('.')
+            output = model(tensor_data[i])
+            loss = criterion(output, tensor_data[i+1])
+            batch += 1
+            if batch >= batch_size:
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                batch = 0
 
 
 train_model(50)
