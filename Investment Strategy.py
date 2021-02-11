@@ -12,7 +12,7 @@ starts = ['20201001', '20200701', '20190601']
 ends = ['20201231', '20200930', '20190831']
 
 #Global variables
-index = 2
+index = 0
 start_date = starts[index]
 end_date = ends[index]
 products = ['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']
@@ -212,17 +212,17 @@ def makeTrade(current_tick, tickers):
                 trans_tracker.make_trade(current_tick, 'BTC-EUR', 'buy', tick.p.btc_eur.volume * 0.499999 / eur_val)
 #------
 #------
-def model_predictions(frame, step=60):
+def model_predictions(frame, step=15):
     # Volatility threshold
-    threshold = 12
-    # print(np.average(df_usd['volume'].values[frame:frame+step]))
-    #TODO convert dataframe to tensor code
-    if np.average(df_usd['volume'].values[frame - step :frame]) > 3 * threshold:
-        step = 15
-    elif np.average(df_usd['volume'].values[frame - step:frame]) > 2 * threshold:
-        step = 20
-    elif np.average(df_usd['volume'].values[frame - step:frame]) > threshold:
-        step = 30
+    # threshold = 12
+    # # print(np.average(df_usd['volume'].values[frame:frame+step]))
+    # #TODO convert dataframe to tensor code
+    # if np.average(df_usd['volume'].values[frame - step :frame]) > 3 * threshold:
+    #     step = 15
+    # elif np.average(df_usd['volume'].values[frame - step:frame]) > 2 * threshold:
+    #     step = 20
+    # elif np.average(df_usd['volume'].values[frame - step:frame]) > threshold:
+    #     step = 30
 
     return np.stack((1/df_usd['close'].values[frame:frame+step],
                     df_eth['close'].values[frame:frame+step],
@@ -231,32 +231,41 @@ def model_predictions(frame, step=60):
 #------
 
 
-def nn_predictions(model):
-    current_stack = currency_stack[:, :, 0:4].clone().detach()
-    out = model(current_stack)
-    out[0] = 1/out[0]
-    out[3] = 1/out[3]
-    return out
+def nn_predictions(usd, eth, ltc, eur):
+    current_stack = currency_stack[0:1, :, 0:4].clone().detach()
+    usd_out = usd(current_stack)
+    current_stack = currency_stack[1:2, :, 0:4].clone().detach()
+    eth_out = eth(current_stack)
+    current_stack = currency_stack[2:3, :, 0:4].clone().detach()
+    ltc_out = ltc(current_stack)
+    current_stack = currency_stack[3:4, :, 0:4].clone().detach()
+    eur_out = eur(current_stack)
+    return torch.stack((1/usd_out, eth_out, ltc_out, 1/eur_out), 0)
 
 
 tick = tick_gen.get_tick()
 # last_price = tick.p.btc_usd.close
-net = NeuralNetwork.FF()
-net.load_state_dict(torch.load("multi_net.pth"))
+usd_net = NeuralNetwork.FF2()
+usd_net.load_state_dict(torch.load("usd_net.pth"))
+eth_net = NeuralNetwork.FF2()
+eth_net.load_state_dict(torch.load("eth_net.pth"))
+ltc_net = NeuralNetwork.FF2()
+ltc_net.load_state_dict(torch.load("ltc_mape_net.pth"))
+eur_net = NeuralNetwork.FF2()
+eur_net.load_state_dict(torch.load("eur_net.pth"))
 # Which frame we are currently on
 frame = 0
-# How many minutes we should wait before tradig (usually because we need enough data)
+# How many minutes we should wait before trading (usually because we need enough data)
 wait = 60
 while tick is not None:
     updateStack(tick)
-    # print(currency_stack[:, 0, 3])
     frame += 1
     #TODO Save tickers into tensor code so we can perform volatility calculations
-    if frame > wait and frame < df_usd['volume'].size - 5:
+    if frame > wait:
         #TODO get predicted tickers from NeuralNetwork
-        #predictions = nn_predictions(net)[:, :5, :]
-        predictions = model_predictions(frame)
-        #print(predictions)
+        predictions = nn_predictions(usd_net, eth_net, ltc_net, eur_net)
+        # predictions = model_predictions(frame)
+        # print(predictions[:, :, 0])
         makeTrade(tick, predictions)
     tick = tick_gen.get_tick()
 
@@ -265,4 +274,4 @@ while tick is not None:
 trans_tracker.plot_btc_holdings()
 print(trans_tracker.get_holdings())
 print(trans_tracker.get_sharpe_ratio())
-trans_tracker.dump_trades('trades_'+str(index)+'.json')
+trans_tracker.dump_trades('usd_trades_'+str(index)+'.json')

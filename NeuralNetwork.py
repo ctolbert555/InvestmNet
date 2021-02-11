@@ -5,6 +5,7 @@ from TDSCoinbaseData import TDSCoinbaseData
 import logging
 logging.getLogger().setLevel(level=logging.ERROR)
 
+
 class FF(nn.Module):
     def __init__(self):
         super(FF, self).__init__()
@@ -24,48 +25,61 @@ class FF(nn.Module):
         return out.reshape((4, 15, 4))
 
 
+class FF2(nn.Module):
+    def __init__(self):
+        super(FF2, self).__init__()
+
+        self.fc1 = nn.Linear(240, 300)
+        self.fc2 = nn.Linear(300, 300)
+        self.fc3 = nn.Linear(300, 100)
+        self.fc4 = nn.Linear(100, 15)
+
+    def forward(self, x):
+
+        out = x.reshape((1, 1, -1))
+        out = self.fc1(out)
+        out = self.fc2(out)
+        out = self.fc3(out)
+        out = self.fc4(out)
+        return out.reshape((1, 15, 1))
+
+
 def MAPE(target, actual):
-    return torch.mean(torch.abs((target-actual)/((target+actual)/2)))
+    return torch.mean(torch.abs((target-actual)/(torch.abs(target) + torch.abs(actual)/2)))
 
 
-def train_model(load_path, save_path, epochs, products=['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']):
-    model = FF()
+def MSE_DIFF(target, actual):
+    targ_diff = target[:, 1:, :] - target[:, :-1, :]
+    act_diff = actual[:, 1:, :] - actual[:, :-1, :]
+    mse = nn.MSELoss()
+    m_diff = mse(targ_diff, act_diff)
+    return m_diff
+
+
+def MAPE_DIFF(target, actual):
+    return MAPE(target, actual) + MSE_DIFF(target, actual)
+
+
+def train_model(load_path, save_path, epochs, product):
+    model = FF2()
     if load_path != "":
         model.load_state_dict(torch.load(load_path))
 
-    criterion = torch.nn.MSELoss()
+    criterion = MAPE_DIFF
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     cb = TDSCoinbaseData()
     start_date = '20200101'
-    end_date = '20200531'
+    end_date = '20200630'
 
-    df_usd = cb.get_market_data(products[0], start_date, end_date, interval=60)
-    df_eth = cb.get_market_data(products[1], start_date, end_date, interval=60)
-    df_ltc = cb.get_market_data(products[2], start_date, end_date, interval=60)
-    df_eur = cb.get_market_data(products[3], start_date, end_date, interval=60)
+    df = cb.get_market_data(product, start_date, end_date, interval=60)
 
-    usd_low = torch.tensor(df_usd['low'].values)
-    eth_low = torch.tensor(df_eth['low'].values)
-    ltc_low = torch.tensor(df_ltc['low'].values)
-    eur_low = torch.tensor(df_eur['low'].values)
-    tensor_low = torch.stack((usd_low, eth_low, ltc_low, eur_low), 0)
-    usd_hi = torch.tensor(df_usd['high'].values)
-    eth_hi = torch.tensor(df_eth['high'].values)
-    ltc_hi = torch.tensor(df_ltc['high'].values)
-    eur_hi = torch.tensor(df_eur['high'].values)
-    tensor_high = torch.stack((usd_hi, eth_hi, ltc_hi, eur_hi), 0)
-    usd_o = torch.tensor(df_usd['open'].values)
-    eth_o = torch.tensor(df_eth['open'].values)
-    ltc_o = torch.tensor(df_ltc['open'].values)
-    eur_o = torch.tensor(df_eur['open'].values)
-    tensor_open = torch.stack((usd_o, eth_o, ltc_o, eur_o), 0)
-    usd_c = torch.tensor(df_usd['close'].values)
-    eth_c = torch.tensor(df_eth['close'].values)
-    ltc_c = torch.tensor(df_ltc['close'].values)
-    eur_c = torch.tensor(df_eur['close'].values)
-    tensor_close = torch.stack((usd_c, eth_c, ltc_c, eur_c), 0)
-    tensor_data = torch.stack([tensor_low, tensor_high, tensor_open, tensor_close], 1).reshape((4, -1, 4)).float()
+    low = torch.tensor(df['low'].values).unsqueeze(0)
+    hi = torch.tensor(df['high'].values).unsqueeze(0)
+    o = torch.tensor(df['open'].values).unsqueeze(0)
+    c = torch.tensor(df['close'].values).unsqueeze(0)
+
+    tensor_data = torch.stack((low, hi, o, c), 2).float()
     print(tensor_data[:, 1:2, :].shape)
     print(tensor_data.shape)
 
@@ -73,7 +87,9 @@ def train_model(load_path, save_path, epochs, products=['BTC-USD', 'ETH-BTC', 'L
         avg_loss = torch.zeros(1)
         for i in range(tensor_data.shape[1] - 75):
             output = model(tensor_data[:, i:i+60, :])
-            loss = criterion(output, tensor_data[:, i+60:i+75, :])
+            loss = criterion(output, tensor_data[:, i+60:i+75, 3:])
+            if torch.isnan(loss):
+                print("FAILED")
             avg_loss += loss
 
             optimizer.zero_grad()
@@ -86,53 +102,44 @@ def train_model(load_path, save_path, epochs, products=['BTC-USD', 'ETH-BTC', 'L
         torch.save(model.state_dict(), save_path)
 
 
-def test_model(path, products=['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']):
-    model = FF()
+def test_model(path, product):
+    model = FF2()
     model.load_state_dict(torch.load(path))
 
-    criterion = torch.nn.L1Loss()
+    criterion = MAPE
 
     cb = TDSCoinbaseData()
-    start_date = '20200601'
-    end_date = '20200630'
+    start_date = '20201001'
+    end_date = '20201231'
 
-    df_usd = cb.get_market_data(products[0], start_date, end_date, interval=60)
-    df_eth = cb.get_market_data(products[1], start_date, end_date, interval=60)
-    df_ltc = cb.get_market_data(products[2], start_date, end_date, interval=60)
-    df_eur = cb.get_market_data(products[3], start_date, end_date, interval=60)
+    df = cb.get_market_data(product, start_date, end_date, interval=60)
 
-    usd_low = torch.tensor(df_usd['low'].values)
-    eth_low = torch.tensor(df_eth['low'].values)
-    ltc_low = torch.tensor(df_ltc['low'].values)
-    eur_low = torch.tensor(df_eur['low'].values)
-    tensor_low = torch.stack((usd_low, eth_low, ltc_low, eur_low), 0)
-    usd_hi = torch.tensor(df_usd['high'].values)
-    eth_hi = torch.tensor(df_eth['high'].values)
-    ltc_hi = torch.tensor(df_ltc['high'].values)
-    eur_hi = torch.tensor(df_eur['high'].values)
-    tensor_high = torch.stack((usd_hi, eth_hi, ltc_hi, eur_hi), 0)
-    usd_o = torch.tensor(df_usd['open'].values)
-    eth_o = torch.tensor(df_eth['open'].values)
-    ltc_o = torch.tensor(df_ltc['open'].values)
-    eur_o = torch.tensor(df_eur['open'].values)
-    tensor_open = torch.stack((usd_o, eth_o, ltc_o, eur_o), 0)
-    usd_c = torch.tensor(df_usd['close'].values)
-    eth_c = torch.tensor(df_eth['close'].values)
-    ltc_c = torch.tensor(df_ltc['close'].values)
-    eur_c = torch.tensor(df_eur['close'].values)
-    tensor_close = torch.stack((usd_c, eth_c, ltc_c, eur_c), 0)
-    tensor_data = torch.stack([tensor_low, tensor_high, tensor_open, tensor_close], 1).reshape((4, -1, 4)).float()
+    low = torch.tensor(df['low'].values).unsqueeze(0)
+    hi = torch.tensor(df['high'].values).unsqueeze(0)
+    o = torch.tensor(df['open'].values).unsqueeze(0)
+    c = torch.tensor(df['close'].values).unsqueeze(0)
+
+    tensor_data = torch.stack((low, hi, o, c), 2).float()
 
     avg_loss = torch.zeros(1)
     for i in range(tensor_data.shape[1] - 75):
         output = model(tensor_data[:, i:i + 60, :])
-        # print(output[:, :, 3], tensor_data[:, i + 60:i + 61, 3])
-        loss = criterion(output[:, :, 3], tensor_data[:, i + 60:i + 75, 3])
+        print("DIFFERENCE")
+        print(output, tensor_data[0, i + 60, 3])
+        loss = criterion(output, tensor_data[:, i + 60:i + 75, 3:])
         avg_loss += loss
     avg_loss /= (tensor_data.shape[1] - 75)
     print("AVG LOSS: ")
     print(avg_loss)
 
 
-#train_model("", "multi_net.pth", 50)
-#test_model("multi_net.pth")
+products=['BTC-USD', 'ETH-BTC', 'LTC-BTC', 'BTC-EUR']
+
+# train_model("usd_net.pth", "usd_md_net.pth", 5, products[0])
+# train_model("eth_net.pth", "eth_md_net.pth", 5, products[1])
+# train_model("ltc_net.pth", "ltc_md_net.pth", 5, products[2])
+# train_model("eur_net.pth", "eur_md_net.pth", 5, products[3])
+# test_model("usd_md_net.pth", products[0])
+# test_model("eth_net.pth", products[1])
+# test_model("ltc_mape_net.pth", products[2])
+# test_model("eur_net.pth", products[3])
